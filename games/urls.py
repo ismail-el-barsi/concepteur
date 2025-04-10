@@ -8,4 +8,6 @@ urlpatterns = [
     path('create/', views.create_game, name='create_game'),
     path('random/', views.random_game, name='random_game'),
     path('game/<int:game_id>/', views.game_detail, name='game_detail'),
+    path('game/<int:game_id>/favorite/', views.toggle_favorite, name='toggle_favorite'),
+    path('favorites/', views.favorites, name='favorites'),
 ]

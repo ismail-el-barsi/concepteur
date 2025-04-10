@@ -1,14 +1,13 @@
 {% extends 'base/base.html' %}
 
-{% block title %}Tableau de bord | GameForge{% endblock %}
+{% block title %}Mes Favoris | GameForge{% endblock %}
 
 {% block content %}
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>Mes concepts de jeux</h1>
+        <h1>Mes jeux favoris</h1>
         <div>
-            <a href="{% url 'create_game' %}" class="btn btn-primary">Créer un nouveau jeu</a>
-            <a href="{% url 'favorites' %}" class="btn btn-outline-primary ms-2">Voir mes favoris</a>
+            <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">Retour au tableau de bord</a>
         </div>
     </div>
     
@@ -19,12 +18,8 @@
             <div class="card h-100 game-card shadow-sm">
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0">{{ game.title }}</h5>
-                    <a href="{% url 'toggle_favorite' game_id=game.id %}?next=dashboard" class="btn btn-sm btn-light">
-                        {% if game in favorited_games %}
+                    <a href="{% url 'toggle_favorite' game_id=game.id %}?next=favorites" class="btn btn-sm btn-light">
                         <i class="bi bi-heart-fill text-danger"></i>
-                        {% else %}
-                        <i class="bi bi-heart"></i>
-                        {% endif %}
                     </a>
                 </div>
                 <div class="card-body">
@@ -35,7 +30,9 @@
                 <div class="card-footer bg-light">
                     <div class="d-flex justify-content-between">
                         <small class="text-muted">Créé le {{ game.created_at|date:"d/m/Y" }}</small>
-                        <a href="{% url 'game_detail' game_id=game.id %}" class="btn btn-sm btn-outline-primary">Voir détails</a>
+                        <div>
+                            <a href="{% url 'game_detail' game_id=game.id %}" class="btn btn-sm btn-outline-primary">Voir détails</a>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -44,10 +41,10 @@
     </div>
     {% else %}
     <div class="alert alert-info text-center">
-        <p class="mb-0">Vous n'avez pas encore créé de jeu.</p>
+        <p class="mb-0">Vous n'avez pas encore ajouté de jeux à vos favoris.</p>
     </div>
     <div class="text-center mt-4">
-        <a href="{% url 'create_game' %}" class="btn btn-lg btn-primary">Créer votre premier jeu</a>
+        <a href="{% url 'dashboard' %}" class="btn btn-lg btn-primary">Parcourir mes jeux</a>
     </div>
     {% endif %}
 </div>

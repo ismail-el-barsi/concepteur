@@ -1,15 +1,17 @@
 import json
 import os
+from datetime import datetime
 
+import openai
 import requests
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from openai import OpenAI
 
-from .forms import GameCreationForm as GameForm
-from .forms import LocationForm
-from .models import Character, Game, Location
+from .forms import GameCreationForm
+from .models import Character, Favorite, Game, Location
 
 
 def home(request):
@@ -18,15 +20,19 @@ def home(request):
 @login_required
 def dashboard(request):
     games = Game.objects.filter(owner=request.user)
+    # Get games this user has favorited
+    favorites = Favorite.objects.filter(user=request.user)
+    favorited_games = [favorite.game for favorite in favorites]
     
     return render(request, 'games/dashboard.html', {
         'games': games,
+        'favorited_games': favorited_games
     })
 
 @login_required
 def create_game(request):
     if request.method == 'POST':
-        form = GameForm(request.POST)
+        form = GameCreationForm(request.POST)
         if form.is_valid():
             # Créer le jeu sans sauvegarder
             game = form.save(commit=False)
@@ -93,7 +99,7 @@ def create_game(request):
             else:
                 messages.error(request, "Erreur lors de la génération du contenu du jeu.")
     else:
-        form = GameForm()
+        form = GameCreationForm()
     
     return render(request, 'games/create_game.html', {'form': form})
 
@@ -103,10 +109,14 @@ def game_detail(request, game_id):
     characters = Character.objects.filter(game=game)
     locations = Location.objects.filter(game=game)
     
+    # Check if this game is favorited
+    is_favorited = Favorite.objects.filter(user=request.user, game=game).exists()
+    
     return render(request, 'games/game_detail.html', {
         'game': game,
         'characters': characters,
         'locations': locations,
+        'is_favorited': is_favorited
     })
 
 @login_required
@@ -174,6 +184,39 @@ def random_game(request):
     else:
         messages.error(request, "Erreur lors de la génération du jeu aléatoire.")
         return redirect('dashboard')
+
+@login_required
+def toggle_favorite(request, game_id):
+    game = get_object_or_404(Game, id=game_id)
+    
+    # Check if the game is already favorited
+    favorite = Favorite.objects.filter(user=request.user, game=game).first()
+    
+    if favorite:
+        # If already favorited, remove the favorite
+        favorite.delete()
+        messages.success(request, f"'{game.title}' a été retiré de vos favoris.")
+    else:
+        # If not favorited, add it to favorites
+        Favorite.objects.create(user=request.user, game=game)
+        messages.success(request, f"'{game.title}' a été ajouté à vos favoris.")
+    
+    # Redirect back to the page the user was on
+    next_url = request.GET.get('next', 'dashboard')
+    
+    # Check if we're redirecting to game_detail and include the game_id
+    if next_url == 'game_detail':
+        return redirect('game_detail', game_id=game_id)
+    
+    return redirect(next_url)
+
+@login_required
+def favorites(request):
+    # Get all favorites for the current user
+    favorites = Favorite.objects.filter(user=request.user)
+    favorited_games = [favorite.game for favorite in favorites]
+    
+    return render(request, 'games/favorites.html', {'games': favorited_games})
 
 def generate_game_content(genre, ambiance, keywords, references):
     """
