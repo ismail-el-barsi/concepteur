@@ -8,8 +8,6 @@
         <h1>Mes concepts de jeux</h1>
         <div>
             <a href="{% url 'create_game' %}" class="btn btn-primary">Créer un nouveau jeu</a>
-            <!-- Désactivé: bouton favoris -->
-            <button class="btn btn-outline-primary ms-2" disabled>Voir mes favoris</button>
         </div>
     </div>
     
@@ -20,10 +18,6 @@
             <div class="card h-100 game-card shadow-sm">
                 <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0">{{ game.title }}</h5>
-                    <!-- Désactivé: bouton favoris -->
-                    <button class="btn btn-sm btn-light" disabled>
-                        <i class="bi bi-heart"></i>
-                    </button>
                 </div>
                 <div class="card-body">
                     <p class="badge bg-secondary mb-2">{{ game.get_genre_display }}</p>

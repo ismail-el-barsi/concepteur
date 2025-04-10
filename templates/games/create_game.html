@@ -8,8 +8,15 @@
 {% endblock %}
 
 {% block content %}
+
 <div class="container py-4">
     <h1 class="mb-4">Créer un nouveau concept de jeu</h1>
+    
+    <!-- Ajout du bouton pour générer un concept aléatoire -->
+    <div class="mb-4 text-center">
+        <a href="{% url 'random_game' %}" id="random-concept-btn" class="btn btn-secondary mb-3">Générer un concept aléatoire</a>
+        <p class="text-muted">Ou personnalisez votre jeu ci-dessous</p>
+    </div>
     
     <div class="card shadow">
         <div class="card-body">
@@ -38,17 +45,24 @@
                     <div class="form-text">Ex: Zelda, Final Fantasy, Shadow of the Colossus</div>
                 </div>
                 
-                <div class="alert alert-info">
-                    <p><strong>Note:</strong> Cette version crée des templates de base que vous pourrez modifier ultérieurement.</p>
+                <div class="alert alert-warning">
+                    <p><strong>Note:</strong> La génération du contenu peut prendre quelques instants pendant que l'IA travaille sur votre concept.</p>
                 </div>
                 
                 <div class="d-grid">
-                    <button type="submit" id="generate-btn" class="btn btn-primary btn-lg">Créer mon jeu</button>
+                    <button type="submit" id="generate-btn" class="btn btn-primary btn-lg">Générer mon jeu</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+<!-- Spinner overlay -->
+<div id="spinner-overlay" class="spinner-overlay">
+    <div class="spinner"></div>
+    <div class="spinner-text">Génération en cours...</div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
