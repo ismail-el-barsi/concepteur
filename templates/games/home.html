@@ -1,0 +1,45 @@
+{% extends 'base/base.html' %}
+
+{% block content %}
+<div class="container px-4 py-5">
+    <div class="row flex-lg-row-reverse align-items-center g-5 py-5">
+        <div class="col-12 col-sm-8 col-lg-6">
+            <img src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=2070&auto=format&fit=crop" class="d-block mx-lg-auto img-fluid rounded shadow" alt="GameForge - Gaming Development Platform" width="700" height="500" loading="lazy">
+        </div>
+        <div class="col-lg-6">
+            <h1 class="display-5 fw-bold lh-1 mb-3">GameForge - Créez votre jeu vidéo avec l'IA</h1>
+            <p class="lead">Générez des concepts de jeux vidéo originaux en quelques clics. Notre plateforme utilise l'IA pour créer des univers immersifs, des personnages fascinants et des histoires captivantes.</p>
+            <div class="d-grid gap-2 d-md-flex justify-content-md-start">
+                {% if user.is_authenticated %}
+                <a href="{% url 'create_game' %}" class="btn btn-primary btn-lg px-4 me-md-2">Créer un jeu</a>
+                <!-- Suppression du lien vers le jeu aléatoire -->
+                {% else %}
+                <a href="{% url 'signup' %}" class="btn btn-primary btn-lg px-4 me-md-2">Inscription</a>
+                <a href="{% url 'login' %}" class="btn btn-outline-secondary btn-lg px-4">Connexion</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="row g-4 py-5 row-cols-1 row-cols-lg-3">
+        <div class="col d-flex align-items-start">
+            <div>
+                <h2>Univers cohérents</h2>
+                <p>Générez des univers de jeu détaillés avec histoire, ambiance et style graphique correspondant à vos goûts.</p>
+            </div>
+        </div>
+        <div class="col d-flex align-items-start">
+            <div>
+                <h2>Personnages mémorables</h2>
+                <p>Créez des personnages avec des histoires uniques, des capacités spéciales et des motivations profondes.</p>
+            </div>
+        </div>
+        <div class="col d-flex align-items-start">
+            <div>
+                <h2>Illustrations conceptuelles</h2>
+                <p>Visualisez votre jeu grâce à des illustrations générées par IA pour vos personnages et environnements.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

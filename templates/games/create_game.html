@@ -1,0 +1,78 @@
+{% extends 'base/base.html' %}
+{% load static %}
+
+{% block title %}Créer un jeu | GameForge{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/spinner.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="mb-4">Créer un nouveau concept de jeu</h1>
+    
+    <div class="card shadow">
+        <div class="card-body">
+            <form method="post" id="gameCreationForm" class="game-form">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label for="id_genre" class="form-label">Genre du jeu</label>
+                    {{ form.genre }}
+                </div>
+                
+                <div class="mb-3">
+                    <label for="id_ambiance" class="form-label">Ambiance</label>
+                    {{ form.ambiance }}
+                </div>
+                
+                <div class="mb-3">
+                    <label for="id_keywords" class="form-label">Mots-clés thématiques</label>
+                    {{ form.keywords }}
+                    <div class="form-text">Entrez plusieurs mots-clés séparés par des virgules</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="id_references" class="form-label">Références culturelles (optionnel)</label>
+                    {{ form.references }}
+                    <div class="form-text">Ex: Zelda, Final Fantasy, Shadow of the Colossus</div>
+                </div>
+                
+                <div class="alert alert-info">
+                    <p><strong>Note:</strong> Cette version crée des templates de base que vous pourrez modifier ultérieurement.</p>
+                </div>
+                
+                <div class="d-grid">
+                    <button type="submit" id="generate-btn" class="btn btn-primary btn-lg">Créer mon jeu</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Récupérer les références aux boutons et au spinner
+        const randomBtn = document.getElementById('random-concept-btn');
+        const generateBtn = document.getElementById('generate-btn');
+        const spinnerOverlay = document.getElementById('spinner-overlay');
+        const form = document.getElementById('gameCreationForm');
+        
+        // Activer le spinner quand on clique sur le bouton de génération aléatoire
+        if (randomBtn) {
+            randomBtn.addEventListener('click', function() {
+                spinnerOverlay.classList.add('active');
+            });
+        }
+        
+        // Activer le spinner lors de la soumission du formulaire
+        if (form) {
+            form.addEventListener('submit', function() {
+                spinnerOverlay.classList.add('active');
+            });
+        }
+    });
+</script>
+{% endblock %}

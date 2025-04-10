@@ -1,0 +1,117 @@
+{% extends 'base/base.html' %}
+{% load game_extras %}
+
+{% block title %}{{ game.title }} | GameForge{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Tableau de bord</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ game.title }}</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="mb-0">{{ game.title }}</h2>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                        <span class="badge bg-secondary">{{ game.genre_name }}</span>
+                        <span class="badge bg-dark">{{ game.ambiance_name }}</span>
+                        {% for keyword in game.keywords|split:"," %}
+                            <span class="badge bg-info">{{ keyword|strip }}</span>
+                        {% endfor %}
+                    </div>
+
+                    <h3>Univers du jeu</h3>
+                    <p>{{ game.universe_description|linebreaks }}</p>
+
+                    <h3>Histoire</h3>
+                    <div class="mb-3">
+                        <h4>Acte 1 - Introduction</h4>
+                        <p>{{ game.story_act1|linebreaks }}</p>
+                    </div>
+                    <div class="mb-3">
+                        <h4>Acte 2 - Développement</h4>
+                        <p>{{ game.story_act2|linebreaks }}</p>
+                    </div>
+                    <div class="mb-3">
+                        <h4>Acte 3 - Conclusion</h4>
+                        <p>{{ game.story_act3|linebreaks }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h3 class="mb-0">Informations</h3>
+                    <!-- Désactivé: bouton favoris -->
+                    <button class="btn btn-sm btn-light" disabled>
+                        <i class="bi bi-heart"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item"><strong>Créé le:</strong> {{ game.created_at|date:"d/m/Y H:i" }}</li>
+                        <li class="list-group-item"><strong>Dernière mise à jour:</strong> {{ game.updated_at|date:"d/m/Y H:i" }}</li>
+                        {% if game.references %}
+                        <li class="list-group-item"><strong>Références:</strong> {{ game.references }}</li>
+                        {% endif %}
+                    </ul>
+                    
+                    <!-- Désactivé: bouton export PDF -->
+                    <div class="mt-3">
+                        <button class="btn btn-outline-primary w-100" disabled>
+                            <i class="bi bi-file-earmark-pdf me-2"></i>Exporter en PDF
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Personnages -->
+    <h3 class="mt-5 mb-3">Personnages</h3>
+    <div class="row row-cols-1 row-cols-md-2 g-4">
+        {% for character in characters %}
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header">
+                    <h4 class="mb-0">{{ character.name }}</h4>
+                </div>
+                <div class="card-body">
+                    <h5>{{ character.role }}</h5>
+                    <h6>Background</h6>
+                    <p>{{ character.background|linebreaks }}</p>
+                    <h6>Capacités</h6>
+                    <p>{{ character.abilities|linebreaks }}</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Lieux -->
+    <h3 class="mt-5 mb-3">Lieux emblématiques</h3>
+    <div class="row row-cols-1 row-cols-md-2 g-4">
+        {% for location in locations %}
+        <div class="col">
+            <div class="card h-100 shadow-sm">
+                <div class="card-header">
+                    <h4 class="mb-0">{{ location.name }}</h4>
+                </div>
+                <div class="card-body">
+                    <p>{{ location.description|linebreaks }}</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
