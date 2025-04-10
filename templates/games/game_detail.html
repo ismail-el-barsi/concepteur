@@ -67,6 +67,13 @@
                         <li class="list-group-item"><strong>Références:</strong> {{ game.references }}</li>
                         {% endif %}
                     </ul>
+                    
+                    <!-- Ajout du bouton d'export PDF -->
+                    <div class="mt-3">
+                        <a href="{% url 'export_game_pdf' game_id=game.id %}" class="btn btn-outline-primary w-100">
+                            <i class="bi bi-file-earmark-pdf me-2"></i>Exporter en PDF
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>

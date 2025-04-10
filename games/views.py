@@ -1,14 +1,19 @@
 import json
 import os
 from datetime import datetime
+from io import BytesIO
 
 import openai
 import requests
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.staticfiles import finders
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import get_template
+from openai import OpenAI
+from xhtml2pdf import pisa
 
 from .forms import GameCreationForm
 from .models import Character, Favorite, Game, Location
@@ -217,6 +222,82 @@ def favorites(request):
     favorited_games = [favorite.game for favorite in favorites]
     
     return render(request, 'games/favorites.html', {'games': favorited_games})
+
+# Ajouter cette fonction pour aider xhtml2pdf à trouver les fichiers statiques
+def link_callback(uri, rel):
+    """
+    Convert HTML URIs to absolute system paths so xhtml2pdf can access those resources
+    """
+    # Utiliser Django's static finder pour trouver les fichiers
+    if uri.startswith(settings.STATIC_URL):
+        path = finders.find(uri.replace(settings.STATIC_URL, ""))
+        return path
+    
+    # Gérer les fichiers média
+    elif uri.startswith(settings.MEDIA_URL):
+        return os.path.join(settings.MEDIA_ROOT, uri.replace(settings.MEDIA_URL, ""))
+    
+    # Gérer les urls absolues
+    elif uri.startswith("http"):
+        return uri
+    
+    # Gestion par défaut
+    return uri
+
+@login_required
+def export_game_pdf(request, game_id):
+    """
+    Export a game as a styled PDF document using xhtml2pdf
+    """
+    game = get_object_or_404(Game, id=game_id, owner=request.user)
+    characters = Character.objects.filter(game=game)
+    locations = Location.objects.filter(game=game)
+    
+    keywords = game.keywords.split(',') if game.keywords else []
+    keywords = [k.strip() for k in keywords]
+    
+    # Prepare the context for the template
+    context = {
+        'game': game,
+        'characters': characters,
+        'locations': locations,
+        'keywords': keywords,
+        'generation_date': datetime.now().strftime("%d/%m/%Y"),
+        'STATIC_URL': settings.STATIC_URL,
+        'base_url': request.build_absolute_uri('/').rstrip('/')
+    }
+    
+    # Render the template
+    template = get_template('games/game_pdf.html')
+    html_string = template.render(context)
+    
+    # Create HTTP response with PDF
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{game.title.replace(" ", "_")}_gameforge.pdf"'
+    
+    # Convert HTML to PDF and write to response
+    pdf_status = html_to_pdf(html_string, response, link_callback)
+    
+    # Return the response
+    if pdf_status:
+        return response
+    else:
+        return HttpResponse("Une erreur s'est produite lors de la génération du PDF.", status=500)
+
+def html_to_pdf(html_string, output, link_callback=None):
+    """
+    Simple function to convert HTML to PDF using xhtml2pdf
+    """
+    # Convert external URLs in the HTML string to base64 for images
+    pisa_status = pisa.CreatePDF(
+        src=html_string,
+        dest=output,
+        encoding='utf-8',
+        link_callback=link_callback
+    )
+    
+    # Return True if PDF generation was successful
+    return pisa_status.err == 0
 
 def generate_game_content(genre, ambiance, keywords, references):
     """
