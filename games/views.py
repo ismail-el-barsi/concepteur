@@ -75,12 +75,12 @@ def create_game(request):
                         abilities=char_data.get('abilities', '')
                     )
                     
-                    # Générer une image pour le personnage avec DALL-E
+                    # Générer une image pour le personnage avec Stable Diffusion
                     character_prompt = f"Portrait of {character.name}, a {character.role} from a {game.genre_name} game with {game.ambiance_name} ambiance."
-                    image_url = generate_image(character_prompt)
-                    if image_url:
+                    image_data = generate_image(character_prompt)
+                    if image_data:
                         # Télécharger et sauvegarder l'image
-                        character.image = download_and_save_image(image_url, f"character_{character.name}.jpg", "characters")
+                        character.image = download_and_save_image(image_data, f"character_{character.name}.jpg", "characters")
                     
                     character.save()
                 
@@ -93,12 +93,12 @@ def create_game(request):
                         description=loc_data.get('description', '')
                     )
                     
-                    # Générer une image pour le lieu avec DALL-E
+                    # Générer une image pour le lieu avec Stable Diffusion
                     location_prompt = f"{location.name} from a {game.genre_name} game with {game.ambiance_name} ambiance, {game.title}."
-                    image_url = generate_image(location_prompt)
-                    if image_url:
+                    image_data = generate_image(location_prompt)
+                    if image_data:
                         # Télécharger et sauvegarder l'image
-                        location.image = download_and_save_image(image_url, f"location_{location.name}.jpg", "locations")
+                        location.image = download_and_save_image(image_data, f"location_{location.name}.jpg", "locations")
                     
                     location.save()
                 
@@ -164,9 +164,9 @@ def random_game(request):
             
             # Générer une image pour le personnage
             character_prompt = f"Portrait of {character.name}, a {character.role} from a {game.genre_name} game with {game.ambiance_name} ambiance."
-            image_url = generate_image(character_prompt)
-            if image_url:
-                character.image = download_and_save_image(image_url, f"character_{character.name}.jpg", "characters")
+            image_data = generate_image(character_prompt)
+            if image_data:
+                character.image = download_and_save_image(image_data, f"character_{character.name}.jpg", "characters")
             
             character.save()
         
@@ -181,9 +181,9 @@ def random_game(request):
             
             # Générer une image pour le lieu
             location_prompt = f"{location.name} from a {game.genre_name} game with {game.ambiance_name} ambiance, {game.title}."
-            image_url = generate_image(location_prompt)
-            if image_url:
-                location.image = download_and_save_image(image_url, f"location_{location.name}.jpg", "locations")
+            image_data = generate_image(location_prompt)
+            if image_data:
+                location.image = download_and_save_image(image_data, f"location_{location.name}.jpg", "locations")
             
             location.save()
         
@@ -418,71 +418,76 @@ def generate_game_content(genre, ambiance, keywords, references):
 
 def generate_image(prompt):
     """
-    Fonction qui utilise l'API DALL-E d'OpenAI pour générer une image
+    Function that uses Hugging Face's Stable Diffusion API to generate an image
     """
-    api_key = os.getenv('OPENAI_API_KEY')
+    # Get Hugging Face API token from environment variables
+    hf_token = os.getenv('HUGGINGFACE_TOKEN')
     
-    if not api_key:
-        print("Erreur: Clé API OpenAI non trouvée dans les variables d'environnement")
-        return None
-    
-    client = OpenAI(api_key=api_key)
+    # Hugging Face API configuration
+    API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2"
+    headers = {"Authorization": f"Bearer {hf_token}"}
     
     try:
-        response = client.images.generate(
-            model="dall-e-3",  # Utilisation de la version 3 de DALL-E pour de meilleurs résultats
-            prompt=prompt,
-            size="1024x1024",
-            quality="standard",
-            n=1,
+        # Send request to Hugging Face API
+        response = requests.post(
+            API_URL,
+            headers=headers,
+            json={"inputs": prompt}
         )
         
-        # Récupérer l'URL de l'image générée
-        image_url = response.data[0].url
-        return image_url
-        
+        # Check if the request was successful
+        if response.status_code == 200:
+            # Return binary image data
+            return response.content
+        else:
+            print(f"Error from Hugging Face API: Status {response.status_code}")
+            print(f"Response: {response.text}")
+            return None
+            
     except Exception as e:
-        print(f"Erreur lors de la génération d'image: {e}")
+        print(f"Error during image generation: {e}")
         return None
 
-def download_and_save_image(url, filename, subfolder):
+def download_and_save_image(image_data, filename, subfolder):
     """
-    Télécharge une image depuis une URL et la sauvegarde dans le système de fichiers
-    Retourne le chemin relatif pour le champ ImageField
+    Saves image data (either URL or binary content) and saves it to the file system
+    Returns the relative path for the ImageField
     """
     try:
-        # Télécharger l'image
-        response = requests.get(url, stream=True)
-        if response.status_code != 200:
-            return None
-        
-        # Créer le dossier media s'il n'existe pas
-        import os
-
-        from django.conf import settings
-        
+        # Create media folder if it doesn't exist
         media_path = os.path.join(settings.MEDIA_ROOT, subfolder)
         if not os.path.exists(media_path):
             os.makedirs(media_path, exist_ok=True)
         
-        # Nettoyer le nom du fichier pour éviter les problèmes de caractères spéciaux
+        # Clean filename to avoid special character issues
         import re
         safe_filename = re.sub(r'[^\w\s.-]', '', filename)
         safe_filename = re.sub(r'\s+', '_', safe_filename)
         
-        # Chemin complet du fichier
+        # Full file path
         file_path = os.path.join(media_path, safe_filename)
         
-        # Enregistrer l'image
-        with open(file_path, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
+        # Check if image_data is a URL (string) or binary content (bytes)
+        if isinstance(image_data, str) and (image_data.startswith('http://') or image_data.startswith('https://')):
+            # Download from URL (old DALL-E method - for backward compatibility)
+            response = requests.get(image_data, stream=True)
+            if response.status_code != 200:
+                return None
+                
+            # Save the image from URL
+            with open(file_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        else:
+            # Save binary data directly (new Stable Diffusion method)
+            with open(file_path, 'wb') as f:
+                f.write(image_data)
         
-        # Retourner le chemin relatif pour le modèle
+        # Return the relative path for the model
         return f"{subfolder}/{safe_filename}"
         
     except Exception as e:
-        print(f"Erreur lors du téléchargement de l'image: {e}")
+        print(f"Error during image save: {e}")
         return None
 
 @login_required
