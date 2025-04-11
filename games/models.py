@@ -40,6 +40,9 @@ class Game(models.Model):
     story_act2 = models.TextField()
     story_act3 = models.TextField()
     
+    # Champs pour le système de narration dynamique
+    has_dynamic_narrative = models.BooleanField(default=False)
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -100,3 +103,30 @@ class Favorite(models.Model):
     
     def __str__(self):
         return f"{self.user.username} - {self.game.title}"
+
+
+# Nouveau modèle pour les choix narratifs
+class NarrativeChoice(models.Model):
+    game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name='narrative_choices')
+    choice_text = models.CharField(max_length=200)
+    outcome_description = models.TextField()
+    act = models.IntegerField(choices=[(1, 'Acte 1'), (2, 'Acte 2'), (3, 'Acte 3')])
+    
+    def __str__(self):
+        return f"{self.game.title} - Choix {self.id} (Acte {self.act})"
+
+
+# Nouveau modèle pour l'historique narratif
+class NarrativeHistory(models.Model):
+    game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name='narrative_history')
+    choice_text = models.CharField(max_length=200)
+    outcome_description = models.TextField()
+    act = models.IntegerField(choices=[(1, 'Acte 1'), (2, 'Acte 2'), (3, 'Acte 3')])
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['created_at']
+        verbose_name_plural = "Narrative histories"
+    
+    def __str__(self):
+        return f"{self.game.title} - Acte {self.act} - {self.created_at.strftime('%d/%m/%Y')}"

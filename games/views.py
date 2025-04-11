@@ -16,7 +16,8 @@ from openai import OpenAI
 from xhtml2pdf import pisa
 
 from .forms import GameCreationForm
-from .models import Character, Favorite, Game, Location
+from .models import (Character, Favorite, Game, Location, NarrativeChoice,
+                     NarrativeHistory)
 
 
 def home(request):
@@ -48,6 +49,7 @@ def create_game(request):
             ambiance = form.cleaned_data['ambiance']
             keywords = form.cleaned_data['keywords']
             references = form.cleaned_data.get('references', '')
+            has_dynamic_narrative = form.cleaned_data.get('has_dynamic_narrative', False)
             
             # Génération du contenu avec l'API OpenAI (ChatGPT)
             game_data = generate_game_content(genre, ambiance, keywords, references)
@@ -59,6 +61,7 @@ def create_game(request):
                 game.story_act1 = game_data.get('story_act1', '')
                 game.story_act2 = game_data.get('story_act2', '')
                 game.story_act3 = game_data.get('story_act3', '')
+                game.has_dynamic_narrative = has_dynamic_narrative
                 game.save()
                 
                 # Création des personnages et génération de leurs images
@@ -303,14 +306,17 @@ def generate_game_content(genre, ambiance, keywords, references):
     """
     Fonction qui appelle l'API OpenAI (ChatGPT) pour générer le contenu du jeu
     """
-    api_key = os.getenv('OPENAI_API_KEY')
+    github_token = os.getenv('GITHUB_TOKEN')
     
-    if not api_key:
-        print("Erreur: Clé API OpenAI non trouvée dans les variables d'environnement")
+    if not github_token:
+        print("Erreur: Token GitHub non trouvé dans les variables d'environnement")
         return None
     
-    # Initialiser le client OpenAI
-    client = OpenAI(api_key=api_key)
+    # Initialiser le client OpenAI avec la nouvelle configuration
+    client = OpenAI(
+        base_url="https://models.inference.ai.azure.com",
+        api_key=github_token,
+    )
     
     # Préparation du prompt pour l'API
     prompt = f"""
@@ -355,15 +361,16 @@ def generate_game_content(genre, ambiance, keywords, references):
     """
     
     try:
-        # Appel à l'API OpenAI
+        # Appel à l'API OpenAI avec le nouveau format
         response = client.chat.completions.create(
-            model="gpt-4",  # Utilisation du modèle GPT-4 pour de meilleurs résultats
+            model="gpt-4o-mini",  
             messages=[
                 {"role": "system", "content": "Tu es un concepteur de jeux vidéo professionnel spécialisé dans la création de concepts originaux."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
-            max_tokens=2000
+            max_tokens=2000,
+            top_p=1
         )
         
         # Extraction du contenu généré
@@ -477,3 +484,320 @@ def download_and_save_image(url, filename, subfolder):
     except Exception as e:
         print(f"Erreur lors du téléchargement de l'image: {e}")
         return None
+
+@login_required
+def narrative_choices(request, game_id):
+    game = get_object_or_404(Game, id=game_id, owner=request.user)
+    
+    if not game.has_dynamic_narrative:
+        messages.error(request, "Ce jeu n'utilise pas le système de narration dynamique.")
+        return redirect('game_detail', game_id=game.id)
+    
+    # Déterminer l'acte actuel en fonction de l'historique des choix
+    narrative_history = NarrativeHistory.objects.filter(game=game)
+    
+    if narrative_history.count() == 0:
+        current_act = 1
+        current_act_name = "Introduction"
+    elif narrative_history.filter(act=1).exists() and not narrative_history.filter(act=2).exists():
+        current_act = 2
+        current_act_name = "Développement"
+    elif narrative_history.filter(act=2).exists():
+        current_act = 3
+        current_act_name = "Conclusion"
+    
+    # Récupérer les choix narratifs disponibles pour l'acte actuel
+    current_choices = NarrativeChoice.objects.filter(game=game, act=current_act)
+    
+    return render(request, 'games/narrative_choices.html', {
+        'game': game,
+        'current_act': current_act,
+        'current_act_name': current_act_name,
+        'current_choices': current_choices,
+        'narrative_history': narrative_history
+    })
+
+@login_required
+def generate_choices(request, game_id):
+    if request.method != 'POST':
+        return redirect('narrative_choices', game_id=game_id)
+    
+    game = get_object_or_404(Game, id=game_id, owner=request.user)
+    
+    if not game.has_dynamic_narrative:
+        messages.error(request, "Ce jeu n'utilise pas le système de narration dynamique.")
+        return redirect('game_detail', game_id=game.id)
+    
+    # Déterminer l'acte actuel
+    narrative_history = NarrativeHistory.objects.filter(game=game)
+    
+    if narrative_history.count() == 0:
+        current_act = 1
+    elif narrative_history.filter(act=1).exists() and not narrative_history.filter(act=2).exists():
+        current_act = 2
+    elif narrative_history.filter(act=2).exists():
+        current_act = 3
+    
+    # Générer de nouveaux choix narratifs avec l'IA
+    choices = generate_narrative_choices(game, current_act, narrative_history)
+    
+    if choices:
+        # Supprimer les anciens choix pour cet acte
+        NarrativeChoice.objects.filter(game=game, act=current_act).delete()
+        
+        # Créer les nouveaux choix
+        for choice_data in choices:
+            NarrativeChoice.objects.create(
+                game=game,
+                act=current_act,
+                choice_text=choice_data.get('choice_text', ''),
+                outcome_description=choice_data.get('outcome_description', '')
+            )
+        
+        messages.success(request, f"Nouveaux choix narratifs générés pour l'acte {current_act}.")
+    else:
+        messages.error(request, "Impossible de générer des choix narratifs pour le moment.")
+    
+    return redirect('narrative_choices', game_id=game.id)
+
+@login_required
+def select_choice(request, game_id, choice_id):
+    if request.method != 'POST':
+        return redirect('narrative_choices', game_id=game_id)
+    
+    game = get_object_or_404(Game, id=game_id, owner=request.user)
+    choice = get_object_or_404(NarrativeChoice, id=choice_id, game=game)
+    
+    # Enregistrer ce choix dans l'historique
+    NarrativeHistory.objects.create(
+        game=game,
+        act=choice.act,
+        choice_text=choice.choice_text,
+        outcome_description=choice.outcome_description
+    )
+    
+    # Supprimer tous les choix de cet acte
+    NarrativeChoice.objects.filter(game=game, act=choice.act).delete()
+    
+    # Mettre à jour l'histoire du jeu selon le choix
+    update_game_story_with_choice(game, choice)
+    
+    messages.success(request, f"Votre choix a été enregistré et l'histoire a été mise à jour.")
+    return redirect('narrative_choices', game_id=game.id)
+
+def generate_narrative_choices(game, act, history):
+    """
+    Utilise l'API OpenAI pour générer des choix narratifs cohérents avec l'histoire du jeu
+    """
+    github_token = os.getenv('GITHUB_TOKEN')
+    
+    if not github_token:
+        return None
+    
+    client = OpenAI(
+        base_url="https://models.inference.ai.azure.com",
+        api_key=github_token,
+    )
+    
+    # Construire le contexte de l'histoire actuelle
+    context = f"Titre: {game.title}\nGenre: {game.get_genre_display()}\nAmbiance: {game.get_ambiance_display()}\n\n"
+    context += f"Description de l'univers: {game.universe_description}\n\n"
+    
+    if act == 1:
+        context += f"Début de l'histoire: {game.story_act1}\n\n"
+    elif act == 2:
+        context += f"Début de l'histoire: {game.story_act1}\n\n"
+        context += f"Développement: {game.story_act2}\n\n"
+    elif act == 3:
+        context += f"Début de l'histoire: {game.story_act1}\n\n"
+        context += f"Développement: {game.story_act2}\n\n"
+        context += f"Vers la conclusion: {game.story_act3}\n\n"
+    
+    # Ajouter l'historique des choix précédents
+    if history.exists():
+        context += "Historique des choix:\n"
+        for entry in history:
+            context += f"- Acte {entry.act}: {entry.choice_text} → {entry.outcome_description}\n"
+    
+    prompt = f"""
+    {context}
+    
+    Générez 3 choix narratifs significatifs pour l'Acte {act} de cette histoire. Chaque choix doit être mémorable 
+    et avoir un impact significatif sur l'histoire. Pour chaque choix, fournissez:
+    1. Un texte de choix clair (ce que le joueur déciderait)
+    2. Une description détaillée de l'impact de ce choix sur l'histoire
+    
+    Format attendu (JSON uniquement):
+    [
+        {{
+            "choice_text": "Premier choix possible",
+            "outcome_description": "Description de la conséquence du premier choix"
+        }},
+        {{
+            "choice_text": "Second choix possible",
+            "outcome_description": "Description de la conséquence du second choix"
+        }},
+        {{
+            "choice_text": "Troisième choix possible",
+            "outcome_description": "Description de la conséquence du troisième choix"
+        }}
+    ]
+    """
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",  # Changed from gpt-4 to gpt-4o-mini
+            messages=[
+                {"role": "system", "content": "Tu es un concepteur narratif de jeux vidéo expert dans la création d'histoires interactives avec des choix significatifs."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=1000,
+            top_p=1
+        )
+        
+        result_text = response.choices[0].message.content
+        
+        # Trouver le début et la fin du JSON dans la réponse
+        json_start = result_text.find('[')
+        json_end = result_text.rfind(']') + 1
+        
+        if json_start >= 0 and json_end > json_start:
+            json_text = result_text[json_start:json_end]
+            try:
+                choices_data = json.loads(json_text)
+                return choices_data
+            except json.JSONDecodeError:
+                print("Erreur: La réponse de l'API n'est pas au format JSON valide")
+        else:
+            print("Erreur: Impossible de trouver du JSON dans la réponse")
+    
+    except Exception as e:
+        print(f"Erreur lors de l'appel à l'API OpenAI: {e}")
+    
+    return None
+
+def update_game_story_with_choice(game, choice):
+    """
+    Met à jour l'histoire du jeu basée sur le choix narratif sélectionné
+    """
+    github_token = os.getenv('GITHUB_TOKEN')
+    
+    if not github_token:
+        return
+    
+    client = OpenAI(
+        base_url="https://models.inference.ai.azure.com",
+        api_key=github_token,
+    )
+    
+    # Construire le contexte de l'histoire actuelle
+    context = f"Titre: {game.title}\nGenre: {game.get_genre_display()}\nAmbiance: {game.get_ambiance_display()}\n\n"
+    context += f"Description de l'univers: {game.universe_description}\n\n"
+    context += f"Histoire actuelle - Acte 1: {game.story_act1}\n\n"
+    
+    if choice.act >= 2:
+        context += f"Histoire actuelle - Acte 2: {game.story_act2}\n\n"
+    
+    if choice.act >= 3:
+        context += f"Histoire actuelle - Acte 3: {game.story_act3}\n\n"
+    
+    # Récupérer tous les choix précédents
+    history = NarrativeHistory.objects.filter(game=game)
+    
+    if history.exists():
+        context += "Historique des choix narratifs:\n"
+        for entry in history:
+            context += f"- Acte {entry.act}: {entry.choice_text} → {entry.outcome_description}\n"
+    
+    # Ajouter le choix actuel
+    context += f"\nChoix actuel (Acte {choice.act}): {choice.choice_text}\n"
+    context += f"Conséquence attendue: {choice.outcome_description}\n"
+    
+    # Demande à l'IA de mettre à jour la partie correspondante de l'histoire
+    if choice.act == 1:
+        prompt = f"""
+        {context}
+        
+        Basé sur ce choix narratif important, réécris l'Acte 1 de l'histoire pour intégrer ce choix et ses conséquences.
+        La nouvelle version doit être cohérente avec l'univers et le ton du jeu, tout en reflétant l'impact du choix.
+        
+        Renvoie uniquement le texte mis à jour pour l'Acte 1.
+        """
+        
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",  
+                messages=[
+                    {"role": "system", "content": "Tu es un écrivain narratif de jeux vidéo expert dans l'adaptation d'histoires selon les choix des joueurs."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=1000,
+                top_p=1
+            )
+            
+            updated_story = response.choices[0].message.content
+            game.story_act1 = updated_story
+            game.save()
+            
+        except Exception as e:
+            print(f"Erreur lors de la mise à jour de l'histoire: {e}")
+            
+    elif choice.act == 2:
+        prompt = f"""
+        {context}
+        
+        Basé sur ce choix narratif important, réécris l'Acte 2 de l'histoire pour intégrer ce choix et ses conséquences.
+        La nouvelle version doit être cohérente avec l'univers et le ton du jeu, tout en reflétant l'impact du choix.
+        
+        Renvoie uniquement le texte mis à jour pour l'Acte 2.
+        """
+        
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",  
+                messages=[
+                    {"role": "system", "content": "Tu es un écrivain narratif de jeux vidéo expert dans l'adaptation d'histoires selon les choix des joueurs."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=1000,
+                top_p=1
+            )
+            
+            updated_story = response.choices[0].message.content
+            game.story_act2 = updated_story
+            game.save()
+            
+        except Exception as e:
+            print(f"Erreur lors de la mise à jour de l'histoire: {e}")
+            
+    elif choice.act == 3:
+        prompt = f"""
+        {context}
+        
+        Basé sur ce choix narratif important, réécris l'Acte 3 (conclusion) de l'histoire pour intégrer ce choix et ses conséquences.
+        La nouvelle version doit être cohérente avec l'univers et le ton du jeu, tout en reflétant l'impact du choix.
+        
+        Renvoie uniquement le texte mis à jour pour l'Acte 3.
+        """
+        
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini", 
+                messages=[
+                    {"role": "system", "content": "Tu es un écrivain narratif de jeux vidéo expert dans l'adaptation d'histoires selon les choix des joueurs."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=1000,
+                top_p=1
+            )
+            
+            updated_story = response.choices[0].message.content
+            game.story_act3 = updated_story
+            game.save()
+            
+        except Exception as e:
+            print(f"Erreur lors de la mise à jour de l'histoire: {e}")

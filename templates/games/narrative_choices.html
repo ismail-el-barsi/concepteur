@@ -1,0 +1,83 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Choix Narratifs - {{ game.title }} | GameForge{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Tableau de bord</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'game_detail' game_id=game.id %}">{{ game.title }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Choix narratifs</li>
+        </ol>
+    </nav>
+
+    <div class="card shadow mb-4">
+        <div class="card-header bg-primary text-white">
+            <h2 class="mb-0">Système de narration dynamique</h2>
+        </div>
+        <div class="card-body">
+            <p class="lead">Faites évoluer votre histoire en sélectionnant des choix narratifs. Chaque choix influencera le déroulement de l'histoire et peut créer de nouvelles branches narratives.</p>
+            
+            <div class="alert alert-info">
+                <p class="mb-0">Actuellement à l'Acte {{ current_act }} - {{ current_act_name }}</p>
+            </div>
+
+            {% if current_choices %}
+            <h3 class="mt-4 mb-3">Choix disponibles</h3>
+            <div class="row row-cols-1 row-cols-md-2 g-4">
+                {% for choice in current_choices %}
+                <div class="col">
+                    <div class="card h-100 narrative-choice-card">
+                        <div class="card-body">
+                            <h4 class="card-title">Option {{ forloop.counter }}</h4>
+                            <p class="card-text">{{ choice.choice_text }}</p>
+                            <form method="post" action="{% url 'select_choice' game_id=game.id choice_id=choice.id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-primary">Choisir cette option</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center my-5">
+                <h4>Aucun choix narratif disponible pour le moment.</h4>
+                <p>Générez de nouvelles options pour faire évoluer votre histoire.</p>
+                <form method="post" action="{% url 'generate_choices' game_id=game.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-lg btn-primary mt-3">
+                        <i class="bi bi-magic me-2"></i>Générer des choix narratifs
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card shadow">
+        <div class="card-header bg-dark text-white">
+            <h3 class="mb-0">Historique des choix</h3>
+        </div>
+        <div class="card-body">
+            {% if narrative_history %}
+            <div class="list-group">
+                {% for entry in narrative_history %}
+                <div class="list-group-item">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h5 class="mb-1">Acte {{ entry.act }}</h5>
+                        <small>{{ entry.created_at|date:"d/m/Y H:i" }}</small>
+                    </div>
+                    <p class="mb-1"><strong>Choix:</strong> {{ entry.choice_text }}</p>
+                    <p class="mb-1"><strong>Conséquence:</strong> {{ entry.outcome_description }}</p>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-center my-4">Aucune décision narrative n'a encore été prise.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
