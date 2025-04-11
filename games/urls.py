@@ -11,4 +11,7 @@ urlpatterns = [
     path('game/<int:game_id>/favorite/', views.toggle_favorite, name='toggle_favorite'),
     path('game/<int:game_id>/export-pdf/', views.export_game_pdf, name='export_game_pdf'),
     path('favorites/', views.favorites, name='favorites'),
+    path('game/<int:game_id>/narrative-choices/', views.narrative_choices, name='narrative_choices'),
+    path('game/<int:game_id>/generate-choices/', views.generate_choices, name='generate_choices'),
+    path('game/<int:game_id>/select-choice/<int:choice_id>/', views.select_choice, name='select_choice'),
 ]

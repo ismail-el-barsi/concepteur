@@ -45,6 +45,15 @@
                     <div class="form-text">Ex: Zelda, Final Fantasy, Shadow of the Colossus</div>
                 </div>
                 
+                <!-- Ajout de l'option de narration dynamique -->
+                <div class="mb-3 form-check">
+                    {{ form.has_dynamic_narrative }}
+                    <label class="form-check-label" for="id_has_dynamic_narrative">
+                        Système de narration dynamique
+                    </label>
+                    <div class="form-text">Le scénario évoluera selon les choix narratifs</div>
+                </div>
+                
                 <div class="alert alert-warning">
                     <p><strong>Note:</strong> La génération du contenu peut prendre quelques instants pendant que l'IA travaille sur votre concept.</p>
                 </div>
